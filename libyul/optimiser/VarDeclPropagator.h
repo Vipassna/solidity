@@ -30,9 +30,18 @@ namespace dev
 namespace yul
 {
 
-/*
- * Requirements:
- * - Disambiguration pass
+/**
+ * Rewrites Assignment statements into VariableDeclaration when the assignment's LHS
+ * variables had no value yet.
+ *
+ * It recursively walks through the AST.
+ * For each Block statement, the VariableDeclaration statements without value are tracked.
+ * For each Assignment statement it is checked if the LHS is first-hand initializing
+ * the corresponding VariableDeclaration.
+ * If so, the Assignment is rewritten into a VariableDeclaration and the original
+ * VariableDeclaration statement(s) are marked for deletion.
+ * At the end of every Block traversal, all pending deletions are performed and
+ * the outer's scope working variables are restored.
  */
 class VarDeclPropagator: public ASTModifier
 {
@@ -47,11 +56,7 @@ private:
 	using TypedName = solidity::assembly::TypedName;
 	using Statement = solidity::assembly::Statement;
 
-	inline Block& currentBlock()
-	{
-		yulAssert(!m_blockScopes.empty(), "Called outside block.");
-		return *m_blockScopes.top();
-	}
+	inline Block& currentBlock() { return *m_currentBlock; }
 
 	bool checkAllVarDeclsEmpty(std::vector<Identifier> const& _varNames) const;
 	TypedName const& getTypedName(Identifier const& _identifier) const;
@@ -62,7 +67,7 @@ private:
 	template<typename StmtT> std::vector<Statement>::iterator iteratorOf(StmtT& stmt);
 
 private:
-	std::stack<Block*> m_blockScopes;
+	Block* m_currentBlock;
 	std::list<VariableDeclaration*> m_emptyVarDecls;
 	std::set<VariableDeclaration*> m_pendingForRemoval;
 };

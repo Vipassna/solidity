@@ -69,21 +69,22 @@ using dev::solidity::assembly::TypedNameList;
 
 void VarDeclPropagator::operator()(Block& _block)
 {
-	// backup outer scope
-	std::list<VariableDeclaration*> emptyVarDecls = move(m_emptyVarDecls);
-	std::set<VariableDeclaration*> pendingForRemoval = move(m_pendingForRemoval);
-	m_blockScopes.push(&_block);
+	std::list<VariableDeclaration*> emptyVarDecls;
+	std::set<VariableDeclaration*> pendingForRemoval;
+
+	swap(emptyVarDecls, m_emptyVarDecls);
+	swap(pendingForRemoval, m_pendingForRemoval);
+	Block* outerBlock = m_currentBlock;
+	m_currentBlock = &_block;
 
 	ASTModifier::operator()(_block);
 
-	// remove all VariableDeclaration's flagged for removal
 	for (VariableDeclaration* varDecl : m_pendingForRemoval)
 		_block.statements.erase(iteratorOf(*varDecl));
 
-	// restore outer scope
 	m_pendingForRemoval = move(pendingForRemoval);
 	m_emptyVarDecls = move(emptyVarDecls);
-	m_blockScopes.pop();
+	m_currentBlock = outerBlock;
 }
 
 void VarDeclPropagator::operator()(VariableDeclaration& _varDecl)
